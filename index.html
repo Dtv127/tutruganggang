@@ -1,0 +1,748 @@
+<title>Lịch Hẹn Nhóm</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+/* Layout: pixel-art scene on top, then two tabs (my hours / group heatmap). Hard borders and offset shadows echo the sprite look. */
+:root {
+  --bg: #e9f3fb;
+  --panel: #ffffff;
+  --soft: #eef4fa;
+  --ink: #1d2744;
+  --muted: #55648a;
+  --edge: #1d2744;
+  --shadow: #b9cde2;
+  --accent: #2f6fd6;
+  --accent-ink: #ffffff;
+  --free: #35b862;
+  --free-ink: #0b2e18;
+  --maybe: #f2c230;
+  --maybe-ink: #3f3000;
+  --busy: #e6edf6;
+  --gold: #f0a800;
+  --h1: #cdeed8; --h2: #97dfae; --h3: #5cc980; --h4: #2fb15c;
+  --h-ink-lo: #1d2744; --h-ink-hi: #0b2e18;
+  --c-ha: #e0457b; --c-vy: #e8892b; --c-nhi: #7a4fd6; --c-duyen: #17a0b2;
+  --font-d: 'Pixelify Sans', 'Courier New', monospace;
+  --font-b: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11162d; --panel: #1a2144; --soft: #232b57; --ink: #e9edff; --muted: #9ba7d2;
+    --edge: #4a58a0; --shadow: #0a0e22; --accent: #6ea2ff; --accent-ink: #0b1230;
+    --free: #3fc76f; --free-ink: #04210f; --maybe: #f2c94c; --maybe-ink: #2f2400;
+    --busy: #252d5a; --gold: #ffcf4a;
+    --h1: #1f4a46; --h2: #2a7a5c; --h3: #37a56f; --h4: #4ccf88;
+    --h-ink-lo: #e9edff; --h-ink-hi: #04201a;
+    --c-ha: #ff6b9c; --c-vy: #ffa34d; --c-nhi: #a583ff; --c-duyen: #3ccbdc;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11162d; --panel: #1a2144; --soft: #232b57; --ink: #e9edff; --muted: #9ba7d2;
+  --edge: #4a58a0; --shadow: #0a0e22; --accent: #6ea2ff; --accent-ink: #0b1230;
+  --free: #3fc76f; --free-ink: #04210f; --maybe: #f2c94c; --maybe-ink: #2f2400;
+  --busy: #252d5a; --gold: #ffcf4a;
+  --h1: #1f4a46; --h2: #2a7a5c; --h3: #37a56f; --h4: #4ccf88;
+  --h-ink-lo: #e9edff; --h-ink-hi: #04201a;
+  --c-ha: #ff6b9c; --c-vy: #ffa34d; --c-nhi: #a583ff; --c-duyen: #3ccbdc;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-b); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 48px;
+}
+.wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1, h2, h3 { font-family: var(--font-d); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: .01em; }
+h1 { font-size: clamp(1.7rem, 5.5vw, 2.4rem); line-height: 1.1; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.scene {
+  display: block; width: 100%; aspect-ratio: 200 / 72; image-rendering: pixelated;
+  border: 3px solid var(--edge); box-shadow: 5px 5px 0 var(--shadow); background: var(--soft);
+}
+.head { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--font-d); font-size: .85rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.sub { color: var(--muted); max-width: 60ch; }
+
+.panel { background: var(--panel); border: 3px solid var(--edge); box-shadow: 4px 4px 0 var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.note { border: 3px dashed var(--edge); padding: 8px 12px; color: var(--muted); font-size: .9rem; background: var(--soft); }
+
+.btn, .chip, .tab, .seg button {
+  font-weight: 700; border: 3px solid var(--edge); background: var(--panel); color: var(--ink);
+  cursor: pointer; border-radius: 0; box-shadow: 3px 3px 0 var(--shadow); min-height: 44px; padding: 6px 14px;
+}
+.btn:active, .chip:active, .tab:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
+.btn.primary, .chip.on, .tab.on, .seg button.on { background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { box-shadow: none; background: transparent; }
+.btn.danger-arm { background: var(--maybe); color: var(--maybe-ink); }
+.chip { min-height: 40px; padding: 4px 12px; font-size: .92rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+.lbl { font-family: var(--font-d); font-size: .95rem; min-width: 84px; color: var(--muted); }
+.seg { display: flex; }
+.seg button { box-shadow: none; margin-left: -3px; }
+.seg button:first-child { margin-left: 0; }
+.seg button.on { position: relative; z-index: 1; }
+select {
+  font: 700 .95rem var(--font-b); color: var(--ink); background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 0; min-height: 44px; padding: 4px 8px;
+}
+
+.final {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--gold); color: #2a1d00; border: 3px solid var(--edge); box-shadow: 4px 4px 0 var(--shadow); padding: 12px 14px;
+}
+.final strong { font-family: var(--font-d); font-size: 1.2rem; }
+.final .btn { background: #fff7d6; color: #2a1d00; }
+
+.tabs { display: flex; gap: 10px; }
+.tab { flex: 1; font-family: var(--font-d); font-size: 1.05rem; }
+
+.people { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.person {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; min-width: 0;
+  border: 3px solid var(--edge); background: var(--panel); box-shadow: 3px 3px 0 var(--shadow); padding: 8px 10px; cursor: pointer; border-radius: 0;
+}
+.person.on { background: var(--soft); outline: 4px solid var(--pc); outline-offset: -4px; }
+.ava { width: 28px; height: 28px; background: var(--pc); color: #fff; font-family: var(--font-d); font-weight: 700; display: grid; place-items: center; border: 2px solid var(--edge); }
+.pn { font-weight: 700; overflow-wrap: anywhere; line-height: 1.15; }
+.pc { font-size: .8rem; color: var(--muted); }
+
+.daystrip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 4px 10px 2px; scroll-snap-type: x proximity; }
+.day {
+  flex: 0 0 auto; min-width: 66px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 0;
+  border: 3px solid var(--edge); background: var(--panel); box-shadow: 3px 3px 0 var(--shadow); padding: 4px 6px; cursor: pointer; border-radius: 0; min-height: 60px;
+}
+.day b { font-family: var(--font-d); font-size: 1rem; }
+.day span { font-size: .8rem; }
+.day small { font-size: .72rem; color: var(--muted); }
+.day.we b { color: var(--c-ha); }
+.day.on { background: var(--accent); color: var(--accent-ink); }
+.day.on b, .day.on small { color: var(--accent-ink); }
+
+.grp { display: flex; flex-direction: column; gap: 8px; }
+.grp-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.grp-head h3 small { font-family: var(--font-b); font-weight: 600; font-size: .8rem; color: var(--muted); margin-left: 6px; }
+.cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+.cell {
+  min-height: 52px; border: 3px solid var(--edge); background: var(--busy); color: var(--ink);
+  font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; cursor: pointer; border-radius: 0; padding: 2px;
+}
+.cell small { font-size: .7rem; font-weight: 700; min-height: 1em; }
+.cell.s1 { background: var(--free); color: var(--free-ink); }
+.cell.s2 { background: var(--maybe); color: var(--maybe-ink); }
+
+.sugs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.sug { border: 3px solid var(--edge); background: var(--soft); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sug.best { border-color: var(--gold); box-shadow: 3px 3px 0 var(--gold); }
+.sug .when { font-family: var(--font-d); font-size: 1.1rem; }
+.badge { align-self: flex-start; font-weight: 700; font-size: .82rem; padding: 2px 8px; background: var(--free); color: var(--free-ink); border: 2px solid var(--edge); }
+.badge.mid { background: var(--maybe); color: var(--maybe-ink); }
+.miss { font-size: .85rem; color: var(--muted); }
+
+.heatwrap { overflow-x: auto; border: 3px solid var(--edge); background: var(--panel); box-shadow: 4px 4px 0 var(--shadow); }
+table.heat { border-collapse: separate; border-spacing: 3px; width: max-content; min-width: 100%; }
+.heat th { font-family: var(--font-d); font-weight: 700; font-size: .85rem; padding: 2px 4px; white-space: nowrap; }
+.heat thead th { color: var(--muted); }
+.heat thead th.per { border-bottom: 3px solid var(--edge); text-align: left; padding-left: 6px; }
+.heat tbody th { position: sticky; left: 0; z-index: 2; background: var(--panel); text-align: left; padding-right: 10px; }
+.heat tbody th.we { color: var(--c-ha); }
+.heat thead th:first-child { position: sticky; left: 0; background: var(--panel); z-index: 2; }
+.heat td { padding: 0; }
+.hc {
+  position: relative; width: 36px; height: 36px; display: grid; place-items: center; border: 2px solid transparent; background: var(--soft);
+  font-weight: 700; font-size: .9rem; color: var(--h-ink-lo); cursor: pointer; border-radius: 0; padding: 0;
+}
+.hc.h1 { background: var(--h1); } .hc.h2 { background: var(--h2); }
+.hc.h3 { background: var(--h3); color: var(--h-ink-hi); } .hc.h4 { background: var(--h4); color: var(--h-ink-hi); }
+.hc.h0 { color: var(--muted); font-weight: 600; }
+.hc.all { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.hc.fin { outline: 3px solid var(--gold); outline-offset: 1px; }
+.hc.sel { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--panel); }
+.hc .mb { position: absolute; right: 2px; top: 2px; width: 7px; height: 7px; background: var(--maybe); border: 1px solid var(--edge); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: .85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--edge); vertical-align: -4px; margin-right: 5px; }
+
+.detail ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.detail li { display: flex; align-items: center; gap: 8px; border: 3px solid var(--edge); padding: 6px 8px; background: var(--soft); min-width: 0; }
+.st { margin-left: auto; font-size: .82rem; font-weight: 700; padding: 1px 8px; border: 2px solid var(--edge); white-space: nowrap; }
+.st.s1 { background: var(--free); color: var(--free-ink); }
+.st.s2 { background: var(--maybe); color: var(--maybe-ink); }
+.st.s0 { background: var(--busy); }
+.empty { color: var(--muted); }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  background: var(--ink); color: var(--bg); font-weight: 700; padding: 10px 16px; border: 3px solid var(--edge); max-width: calc(100vw - 32px);
+}
+
+@media (max-width: 560px) {
+  .people { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lbl { min-width: 100%; }
+  .panel { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn:active, .chip:active, .tab:active { transform: none; }
+}
+</style>
+
+<div class="wrap">
+  <canvas id="scene" class="scene" width="200" height="72" role="img" aria-label="Cảnh pixel art: bốn bạn đứng dưới cầu vồng bên cạnh cái cây và cái ao"></canvas>
+
+  <header class="head">
+    <div class="eyebrow">Hà · Vy · Nhi Trần · Duyên Bùi</div>
+    <h1>Khi nào cả nhóm rảnh?</h1>
+    <p class="sub">Mỗi bạn chọn tên mình rồi chạm vào các giờ rảnh trong 14 ngày tới. Tab “Xem cả nhóm” tự tìm giờ nhiều người rảnh nhất.</p>
+  </header>
+
+  <div id="app"></div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- constants ---------- */
+  var H0 = 6, H1 = 22, NH = 17;
+  var HOURS = []; for (var hh = H0; hh <= H1; hh++) HOURS.push(hh);
+  var PEOPLE = [
+    { id: 'ha', name: 'Hà', color: '--c-ha' },
+    { id: 'vy', name: 'Vy', color: '--c-vy' },
+    { id: 'nhi', name: 'Nhi Trần', color: '--c-nhi' },
+    { id: 'duyen', name: 'Duyên Bùi', color: '--c-duyen' }
+  ];
+  var PERIODS = [
+    { id: 'sang', name: 'Sáng', from: 6, to: 11 },
+    { id: 'trua', name: 'Trưa', from: 11, to: 14 },
+    { id: 'chieu', name: 'Chiều', from: 14, to: 18 },
+    { id: 'toi', name: 'Tối', from: 18, to: 23 }
+  ];
+  var LONG = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+  var SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  var STATUS = ['Không rảnh', 'Rảnh', 'Có thể'];
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  var DAYS = [];
+  (function () {
+    var base = new Date(); base.setHours(0, 0, 0, 0);
+    for (var i = 0; i < 14; i++) {
+      var d = new Date(base); d.setDate(base.getDate() + i);
+      DAYS.push({ idx: i, key: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), dow: d.getDay(), dd: d.getDate(), mm: d.getMonth() + 1 });
+    }
+  })();
+
+  /* ---------- state ---------- */
+  var S = {
+    me: null, tab: 'toi', day: 0,
+    brush: 1, fillDays: 'cur', from: 18, to: 23,
+    people: { ha: {}, vy: {}, nhi: {}, duyen: {} },
+    final: null, sel: null, confirmClear: false,
+    view: { period: 'all', dtype: 'all', dur: 2 },
+    note: ''
+  };
+  var DB = null, dirty = {}, timers = {}, saving = {};
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  S.me = lsGet('lichhen-me');
+  if (!PEOPLE.some(function (p) { return p.id === S.me; })) S.me = null;
+
+  /* ---------- data helpers ---------- */
+  function getv(id, key, h) {
+    var s = S.people[id][key];
+    if (!s) return 0;
+    var c = s.charAt(h - H0);
+    return c === '1' ? 1 : c === '2' ? 2 : 0;
+  }
+  function setv(id, key, h, v) {
+    var p = S.people[id];
+    var s = p[key] || new Array(NH + 1).join('0');
+    s = s.slice(0, h - H0) + v + s.slice(h - H0 + 1);
+    if (/^0+$/.test(s)) delete p[key]; else p[key] = s;
+  }
+  function cleanSlots(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    DAYS.forEach(function (d) {
+      var s = raw[d.key];
+      if (typeof s === 'string' && /^[012]+$/.test(s)) out[d.key] = (s + new Array(NH + 1).join('0')).slice(0, NH);
+    });
+    return out;
+  }
+  function marked(id) {
+    var n = 0;
+    DAYS.forEach(function (d) { var s = S.people[id][d.key]; if (s) for (var i = 0; i < s.length; i++) if (s.charAt(i) !== '0') n++; });
+    return n;
+  }
+  function markedDay(id, key) {
+    var s = S.people[id][key], n = 0;
+    if (s) for (var i = 0; i < s.length; i++) if (s.charAt(i) !== '0') n++;
+    return n;
+  }
+  function saveLocal() {
+    lsSet('lichhen-local', JSON.stringify({ people: S.people, final: S.final }));
+  }
+  function loadLocal() {
+    try {
+      var o = JSON.parse(lsGet('lichhen-local') || 'null');
+      if (o && o.people) PEOPLE.forEach(function (p) { S.people[p.id] = cleanSlots(o.people[p.id]); });
+      if (o && o.final) S.final = validFinal(o.final);
+    } catch (e) {}
+  }
+  function validFinal(f) {
+    if (!f || typeof f.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(f.date)) return null;
+    var a = +f.start, b = +f.end;
+    if (!(a >= H0 && b > a && b <= H1 + 1)) return null;
+    return { date: f.date, start: a, end: b };
+  }
+
+  function persist(id) {
+    dirty[id] = true; saveLocal();
+    clearTimeout(timers[id]);
+    timers[id] = setTimeout(function () { flush(id); }, 500);
+  }
+  function flush(id) {
+    if (!DB) return;
+    if (saving[id]) { timers[id] = setTimeout(function () { flush(id); }, 300); return; }
+    saving[id] = true;
+    var snap = JSON.stringify(S.people[id]);
+    DB.doc('avail/' + id).set({ slots: S.people[id], updatedAt: Date.now() }).then(function () {
+      if (JSON.stringify(S.people[id]) === snap) dirty[id] = false; else flush(id);
+    }).catch(function () {
+      toast('Chưa lưu được lên dữ liệu chung. Hỏi chủ trang cấp quyền Contributor nhé.');
+    }).then(function () { saving[id] = false; });
+  }
+
+  /* ---------- small utils ---------- */
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+  function dayLabel(d) { return LONG[d.dow] + ' ' + d.dd + '/' + d.mm; }
+  function labelFromKey(key) {
+    var m = key.split('-'); var dt = new Date(+m[0], +m[1] - 1, +m[2]);
+    return LONG[dt.getDay()] + ' ' + (+m[2]) + '/' + (+m[1]);
+  }
+  function periodOf(h) { for (var i = 0; i < PERIODS.length; i++) if (h >= PERIODS[i].from && h < PERIODS[i].to) return PERIODS[i]; return PERIODS[3]; }
+  function dayMatches(d, type) {
+    if (type === 'wk') return d.dow >= 1 && d.dow <= 5;
+    if (type === 'we') return d.dow === 0 || d.dow === 6;
+    return true;
+  }
+  function visibleHours() {
+    var p = S.view.period;
+    return HOURS.filter(function (h) { return p === 'all' || periodOf(h).id === p; });
+  }
+  function visibleDays() { return DAYS.filter(function (d) { return dayMatches(d, S.view.dtype); }); }
+  function person(id) { return PEOPLE.filter(function (p) { return p.id === id; })[0]; }
+
+  /* ---------- render: my hours ---------- */
+  function chip(act, data, label, on) {
+    var attrs = ''; for (var k in data) attrs += ' data-' + k + '="' + data[k] + '"';
+    return '<button class="chip' + (on ? ' on' : '') + '" data-a="' + act + '"' + attrs + ' data-fk="' + act + '-' + (data.v || '') + '">' + label + '</button>';
+  }
+  function periodChipOn(p) { return S.from === p.from && S.to === p.to; }
+
+  function renderPeople() {
+    return '<div class="people">' + PEOPLE.map(function (p) {
+      var n = marked(p.id);
+      return '<button class="person' + (S.me === p.id ? ' on' : '') + '" data-a="me" data-id="' + p.id + '" data-fk="me-' + p.id + '" style="--pc:var(' + p.color + ')" aria-pressed="' + (S.me === p.id) + '">' +
+        '<span class="ava">' + p.name.charAt(0) + '</span><span class="pn">' + p.name + '</span><span class="pc">' + (n ? n + ' giờ đã chọn' : 'chưa nhập') + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function renderMine() {
+    var out = '<section class="panel"><h2>Bạn là ai?</h2>' + renderPeople();
+    if (!S.me) out += '<p class="empty">Chọn tên của bạn để bắt đầu tô giờ rảnh.</p>';
+    out += '</section>';
+    if (!S.me) return out;
+
+    var d = DAYS[S.day];
+    var fillDayChips =
+      chip('fd', { v: 'cur' }, 'Ngày đang chọn (' + SHORT[d.dow] + ' ' + d.dd + '/' + d.mm + ')', S.fillDays === 'cur') +
+      chip('fd', { v: 'all' }, 'Cả 14 ngày', S.fillDays === 'all') +
+      chip('fd', { v: 'wk' }, 'Ngày thường', S.fillDays === 'wk') +
+      chip('fd', { v: 'we' }, 'Cuối tuần', S.fillDays === 'we');
+    var periodChips = PERIODS.map(function (p) { return chip('fp', { v: p.id }, p.name + ' ' + p.from + '–' + p.to + 'h', periodChipOn(p)); }).join('') +
+      chip('fp', { v: 'all' }, 'Cả ngày', S.from === H0 && S.to === H1 + 1);
+    var fromOpts = '', toOpts = '';
+    for (var h = H0; h <= H1; h++) fromOpts += '<option value="' + h + '"' + (S.from === h ? ' selected' : '') + '>' + h + ':00</option>';
+    for (var h2 = H0 + 1; h2 <= H1 + 1; h2++) toOpts += '<option value="' + h2 + '"' + (S.to === h2 ? ' selected' : '') + '>' + h2 + ':00</option>';
+    var seg = '<div class="seg" role="group" aria-label="Trạng thái">' + [[1, 'Rảnh'], [2, 'Có thể'], [0, 'Bận']].map(function (b) {
+      return '<button class="' + (S.brush === b[0] ? 'on' : '') + '" data-a="br" data-v="' + b[0] + '" data-fk="br-' + b[0] + '">' + b[1] + '</button>';
+    }).join('') + '</div>';
+
+    out += '<section class="panel"><h2>Chọn nhanh</h2>' +
+      '<div class="row"><span class="lbl">Áp dụng cho</span><div class="chips">' + fillDayChips + '</div></div>' +
+      '<div class="row"><span class="lbl">Buổi</span><div class="chips">' + periodChips + '</div></div>' +
+      '<div class="row"><span class="lbl">Khoảng giờ</span><select id="selFrom" data-s="from" aria-label="Từ giờ">' + fromOpts + '</select><span>đến</span><select id="selTo" data-s="to" aria-label="Đến giờ">' + toOpts + '</select></div>' +
+      '<div class="row"><span class="lbl">Đánh dấu là</span>' + seg + '</div>' +
+      '<div class="row"><button class="btn primary" data-a="apply" data-fk="apply">Tô vào lịch</button>' +
+      '<button class="btn ghost' + (S.confirmClear ? ' danger-arm' : '') + '" data-a="clear" data-fk="clear">' + (S.confirmClear ? 'Bấm lần nữa để xóa hết' : 'Xóa hết lịch của tôi') + '</button></div>' +
+      '</section>';
+
+    var strip = DAYS.map(function (dd) {
+      var n = markedDay(S.me, dd.key);
+      return '<button class="day' + (dd.dow === 0 || dd.dow === 6 ? ' we' : '') + (dd.idx === S.day ? ' on' : '') + '" data-a="day" data-v="' + dd.idx + '" data-fk="day-' + dd.idx + '">' +
+        '<b>' + SHORT[dd.dow] + '</b><span>' + dd.dd + '/' + dd.mm + '</span><small>' + (n ? n + ' giờ' : 'trống') + '</small></button>';
+    }).join('');
+
+    var groups = PERIODS.map(function (p) {
+      var cells = '', all1 = true;
+      for (var h = p.from; h < p.to; h++) {
+        var v = getv(S.me, d.key, h); if (v !== 1) all1 = false;
+        cells += '<button class="cell s' + v + '" data-a="cell" data-h="' + h + '" data-fk="c' + h + '" aria-label="' + h + ' giờ, ' + STATUS[v] + '">' + h + 'h<small>' + (v === 1 ? 'rảnh' : v === 2 ? 'có thể' : '') + '</small></button>';
+      }
+      return '<div class="grp"><div class="grp-head"><h3>' + p.name + '<small>' + p.from + 'h–' + p.to + 'h</small></h3>' +
+        '<button class="chip" data-a="grp" data-v="' + p.id + '" data-fk="grp-' + p.id + '">' + (all1 ? 'Bỏ cả buổi' : 'Rảnh cả buổi') + '</button></div><div class="cells">' + cells + '</div></div>';
+    }).join('');
+
+    out += '<section class="panel"><h2>' + dayLabel(d) + '</h2><p class="sub">Chạm vào một giờ để đổi: trống, rảnh, có thể.</p>' +
+      '<div id="daystrip" class="daystrip">' + strip + '</div>' + groups + '</section>';
+    return out;
+  }
+
+  /* ---------- group computation ---------- */
+  function counts(key, h) {
+    var free = 0, maybe = 0;
+    PEOPLE.forEach(function (p) { var v = getv(p.id, key, h); if (v === 1) free++; else if (v === 2) maybe++; });
+    return { free: free, maybe: maybe };
+  }
+  function windowStatus(id, key, h, D) {
+    var has2 = false;
+    for (var k = 0; k < D; k++) { var v = getv(id, key, h + k); if (v === 0) return 0; if (v === 2) has2 = true; }
+    return has2 ? 2 : 1;
+  }
+  function suggestions() {
+    var D = S.view.dur, hrs = visibleHours(), days = visibleDays(), out = [];
+    var now = new Date(), todayKey = DAYS[0].key, nowH = now.getHours();
+    days.forEach(function (d) {
+      hrs.forEach(function (h) {
+        for (var k = 0; k < D; k++) if (hrs.indexOf(h + k) < 0) return;
+        if (d.key === todayKey && h <= nowH) return;
+        var st = PEOPLE.map(function (p) { return windowStatus(p.id, d.key, h, D); });
+        var free = st.filter(function (x) { return x === 1; }).length;
+        var maybe = st.filter(function (x) { return x === 2; }).length;
+        var score = free + maybe * 0.5;
+        if (score < 1) return;
+        out.push({ d: d, h: h, st: st, free: free, maybe: maybe, score: score });
+      });
+    });
+    out.sort(function (a, b) { return (b.score - a.score) || (a.d.idx - b.d.idx) || (a.h - b.h); });
+    var chosen = [];
+    for (var i = 0; i < out.length && chosen.length < 3; i++) {
+      var c = out[i];
+      if (chosen.some(function (x) { return x.d === c.d && Math.abs(x.h - c.h) < D; })) continue;
+      chosen.push(c);
+    }
+    return chosen;
+  }
+
+  /* ---------- render: group ---------- */
+  function renderGroup() {
+    var V = S.view;
+    var anyData = PEOPLE.some(function (p) { return marked(p.id) > 0; });
+    var empties = PEOPLE.filter(function (p) { return marked(p.id) === 0; }).map(function (p) { return p.name; });
+
+    var filters = '<section class="panel"><h2>Bộ lọc</h2>' +
+      '<div class="row"><span class="lbl">Buổi</span><div class="chips">' +
+      chip('vp', { v: 'all' }, 'Tất cả', V.period === 'all') +
+      PERIODS.map(function (p) { return chip('vp', { v: p.id }, p.name, V.period === p.id); }).join('') + '</div></div>' +
+      '<div class="row"><span class="lbl">Ngày</span><div class="chips">' +
+      chip('vd', { v: 'all' }, 'Tất cả', V.dtype === 'all') + chip('vd', { v: 'wk' }, 'Ngày thường', V.dtype === 'wk') + chip('vd', { v: 'we' }, 'Cuối tuần', V.dtype === 'we') + '</div></div>' +
+      '<div class="row"><span class="lbl">Cần bao lâu</span><div class="chips">' +
+      [1, 2, 3, 4].map(function (n) { return chip('vl', { v: n }, n + ' tiếng', V.dur === n); }).join('') + '</div></div>' +
+      (empties.length && empties.length < 4 ? '<p class="miss">Chưa nhập: ' + empties.join(', ') + '</p>' : '') +
+      '</section>';
+
+    var sugs = suggestions(), sugHtml;
+    if (!anyData) {
+      sugHtml = '<p class="empty">Chưa ai nhập giờ rảnh. Qua tab “Giờ rảnh của tôi” để bắt đầu, gợi ý sẽ hiện ở đây.</p>';
+    } else if (!sugs.length) {
+      sugHtml = '<p class="empty">Chưa có khung ' + V.dur + ' tiếng nào có người rảnh. Thử đổi bộ lọc hoặc cho ngắn lại.</p>';
+    } else {
+      sugHtml = '<div class="sugs">' + sugs.map(function (s, i) {
+        var missing = PEOPLE.filter(function (p, j) { return s.st[j] === 0; }).map(function (p) { return p.name; });
+        var maybes = PEOPLE.filter(function (p, j) { return s.st[j] === 2; }).map(function (p) { return p.name; });
+        var badge = s.free === 4 ? 'Cả 4 người rảnh' : s.free + ' rảnh' + (s.maybe ? ' · ' + s.maybe + ' có thể' : '');
+        return '<div class="sug' + (i === 0 ? ' best' : '') + '"><div class="when">' + dayLabel(s.d) + '<br>' + s.h + 'h–' + (s.h + V.dur) + 'h</div>' +
+          '<span class="badge' + (s.free === 4 ? '' : ' mid') + '">' + badge + '</span>' +
+          (missing.length ? '<span class="miss">Thiếu: ' + missing.join(', ') + '</span>' : '') +
+          (maybes.length ? '<span class="miss">Có thể: ' + maybes.join(', ') + '</span>' : '') +
+          '<div class="row"><button class="btn" data-a="pick" data-k="' + s.d.key + '" data-h="' + s.h + '" data-fk="pick-' + i + '">Chi tiết</button>' +
+          '<button class="btn primary" data-a="fin" data-k="' + s.d.key + '" data-h="' + s.h + '" data-fk="sfin-' + i + '">Chốt</button></div></div>';
+      }).join('') + '</div>';
+    }
+    var sugPanel = '<section class="panel"><h2>Gợi ý hay nhất</h2>' + sugHtml + '</section>';
+
+    var hrs = visibleHours(), days = visibleDays();
+    var head1 = '<tr><th></th>', head2 = '<tr><th></th>';
+    PERIODS.forEach(function (p) {
+      var n = hrs.filter(function (h) { return periodOf(h).id === p.id; }).length;
+      if (n) head1 += '<th class="per" colspan="' + n + '">' + p.name + '</th>';
+    });
+    hrs.forEach(function (h) { head2 += '<th>' + h + 'h</th>'; });
+    head1 += '</tr>'; head2 += '</tr>';
+    var body = days.map(function (d) {
+      var row = '<tr><th class="' + (d.dow === 0 || d.dow === 6 ? 'we' : '') + '">' + SHORT[d.dow] + ' ' + d.dd + '/' + d.mm + '</th>';
+      hrs.forEach(function (h) {
+        var c = counts(d.key, h);
+        var isFin = S.final && S.final.date === d.key && h >= S.final.start && h < S.final.end;
+        var isSel = S.sel && S.sel.key === d.key && S.sel.h === h;
+        row += '<td><button class="hc h' + c.free + (c.free === 4 ? ' all' : '') + (isFin ? ' fin' : '') + (isSel ? ' sel' : '') + '" data-a="hc" data-k="' + d.key + '" data-h="' + h + '" data-fk="hc-' + d.idx + '-' + h + '" aria-label="' + dayLabel(d) + ', ' + h + ' giờ: ' + c.free + ' người rảnh' + (c.maybe ? ', ' + c.maybe + ' có thể' : '') + '">' +
+          (c.free || '·') + (c.maybe ? '<i class="mb"></i>' : '') + '</button></td>';
+      });
+      return row + '</tr>';
+    }).join('');
+
+    var legend = '<div class="legend"><span>Số người rảnh:</span>' +
+      [0, 1, 2, 3, 4].map(function (n) { return '<span><i style="background:var(' + (n ? '--h' + n : '--soft') + ')"></i>' + n + '</span>'; }).join('') +
+      '<span><i style="background:var(--maybe);width:9px;height:9px"></i>có người chọn “có thể”</span>' +
+      '<span><i style="border-color:var(--gold);background:var(--h4)"></i>cả 4 rảnh</span></div>';
+
+    var heat = '<section class="panel"><h2>Bản đồ nhiệt</h2>' + legend +
+      '<div class="heatwrap"><table class="heat"><thead>' + head1 + head2 + '</thead><tbody>' + body + '</tbody></table></div>' +
+      '<p class="sub">Chạm vào một ô để xem ai rảnh.</p></section>';
+
+    var detail = '';
+    if (S.sel) {
+      var dd = DAYS.filter(function (x) { return x.key === S.sel.key; })[0];
+      if (dd) {
+        var lis = PEOPLE.map(function (p) {
+          var v = getv(p.id, dd.key, S.sel.h);
+          return '<li><span class="ava" style="--pc:var(' + p.color + ')">' + p.name.charAt(0) + '</span><span class="pn">' + p.name + '</span><span class="st s' + v + '">' + STATUS[v] + '</span></li>';
+        }).join('');
+        var end = Math.min(S.sel.h + V.dur, H1 + 1);
+        detail = '<section class="panel detail"><h2>' + dayLabel(dd) + ' · ' + S.sel.h + 'h</h2><ul>' + lis + '</ul>' +
+          '<div class="row"><button class="btn primary" data-a="fin" data-k="' + dd.key + '" data-h="' + S.sel.h + '" data-fk="dfin">Chốt ' + S.sel.h + 'h–' + end + 'h</button>' +
+          '<span class="sub">Đổi độ dài ở mục “Cần bao lâu”.</span></div></section>';
+      }
+    }
+    return filters + sugPanel + heat + detail;
+  }
+
+  /* ---------- render root ---------- */
+  function render() {
+    var app = $('#app');
+    var strip = $('#daystrip'), heatw = $('.heatwrap');
+    var scStrip = strip ? strip.scrollLeft : 0, scHeat = heatw ? heatw.scrollLeft : 0;
+    var ae = document.activeElement, fk = ae && ae.dataset ? ae.dataset.fk : null;
+    var selId = ae && ae.id && ae.tagName === 'SELECT' ? ae.id : null;
+
+    var html = '';
+    if (S.note) html += '<div class="note">' + S.note + '</div>';
+    if (S.final) {
+      html += '<div class="final"><div><div class="eyebrow" style="color:inherit">Đã chốt</div><strong>' + labelFromKey(S.final.date) + ' · ' + S.final.start + 'h–' + S.final.end + 'h</strong></div>' +
+        '<button class="btn" data-a="unfin" data-fk="unfin">Bỏ chốt</button></div>';
+    }
+    html += '<div class="tabs" role="tablist"><button class="tab' + (S.tab === 'toi' ? ' on' : '') + '" role="tab" data-a="tab" data-v="toi" data-fk="tab-toi">Giờ rảnh của tôi</button>' +
+      '<button class="tab' + (S.tab === 'nhom' ? ' on' : '') + '" role="tab" data-a="tab" data-v="nhom" data-fk="tab-nhom">Xem cả nhóm</button></div>';
+    html += S.tab === 'nhom' ? renderGroup() : renderMine();
+    app.innerHTML = '<div style="display:flex;flex-direction:column;gap:18px">' + html + '</div>';
+
+    var ns = $('#daystrip'), nh = $('.heatwrap');
+    if (ns) ns.scrollLeft = scStrip;
+    if (nh) nh.scrollLeft = scHeat;
+    if (selId) { var s = document.getElementById(selId); if (s) s.focus(); }
+    else if (fk) { var el = app.querySelector('[data-fk="' + fk + '"]'); if (el) el.focus({ preventScroll: true }); }
+  }
+
+  /* ---------- actions ---------- */
+  var CYCLE = [1, 2, 0];
+  function targetDays() {
+    if (S.fillDays === 'cur') return [DAYS[S.day]];
+    if (S.fillDays === 'all') return DAYS;
+    return DAYS.filter(function (d) { return dayMatches(d, S.fillDays); });
+  }
+  function needMe() { if (!S.me) { toast('Chọn tên của bạn trước nhé.'); return true; } return false; }
+
+  function act(a, d) {
+    switch (a) {
+      case 'tab': location.hash = d.v; S.tab = d.v; break;
+      case 'me': S.me = d.id; lsSet('lichhen-me', d.id); break;
+      case 'day': S.day = +d.v; break;
+      case 'cell':
+        if (needMe()) return;
+        var key = DAYS[S.day].key, h = +d.h, v = getv(S.me, key, h);
+        setv(S.me, key, h, CYCLE[v]); persist(S.me); break;
+      case 'grp':
+        if (needMe()) return;
+        var p = PERIODS.filter(function (x) { return x.id === d.v; })[0], k2 = DAYS[S.day].key, all1 = true, hh;
+        for (hh = p.from; hh < p.to; hh++) if (getv(S.me, k2, hh) !== 1) all1 = false;
+        for (hh = p.from; hh < p.to; hh++) setv(S.me, k2, hh, all1 ? 0 : 1);
+        persist(S.me); break;
+      case 'fd': S.fillDays = d.v; S.confirmClear = false; break;
+      case 'fp':
+        if (d.v === 'all') { S.from = H0; S.to = H1 + 1; }
+        else { var pp = PERIODS.filter(function (x) { return x.id === d.v; })[0]; S.from = pp.from; S.to = pp.to; }
+        break;
+      case 'br': S.brush = +d.v; break;
+      case 'apply':
+        if (needMe()) return;
+        var n = 0;
+        targetDays().forEach(function (day) { for (var x = S.from; x < S.to; x++) { setv(S.me, day.key, x, S.brush); n++; } });
+        persist(S.me); toast(S.brush === 0 ? 'Đã bỏ ' + n + ' giờ.' : 'Đã tô ' + n + ' giờ.'); break;
+      case 'clear':
+        if (needMe()) return;
+        if (!S.confirmClear) { S.confirmClear = true; clearTimeout(act.ct); act.ct = setTimeout(function () { S.confirmClear = false; render(); }, 3500); break; }
+        S.confirmClear = false; S.people[S.me] = {}; persist(S.me); toast('Đã xóa lịch của bạn.'); break;
+      case 'vp': S.view.period = d.v; S.sel = null; break;
+      case 'vd': S.view.dtype = d.v; S.sel = null; break;
+      case 'vl': S.view.dur = +d.v; break;
+      case 'hc': case 'pick':
+        S.sel = { key: d.k, h: +d.h };
+        if (a === 'pick') setTimeout(function () { var el = $('.detail'); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 30);
+        break;
+      case 'fin':
+        var end = Math.min(+d.h + S.view.dur, H1 + 1);
+        S.final = { date: d.k, start: +d.h, end: end }; saveLocal();
+        if (DB) DB.doc('meta/final').set({ date: d.k, start: +d.h, end: end, at: Date.now() }).catch(function () { toast('Chưa lưu được giờ chốt lên dữ liệu chung.'); });
+        toast('Đã chốt ' + labelFromKey(d.k) + ', ' + d.h + 'h–' + end + 'h.'); break;
+      case 'unfin':
+        S.final = null; saveLocal();
+        if (DB) DB.doc('meta/final').delete().catch(function () {});
+        break;
+    }
+    render();
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-a]') : null;
+    if (t) act(t.dataset.a, t.dataset);
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.dataset || !t.dataset.s) return;
+    var v = +t.value;
+    if (t.dataset.s === 'from') { S.from = v; if (S.to <= S.from) S.to = Math.min(S.from + 1, H1 + 1); }
+    else { S.to = v; if (S.from >= S.to) S.from = Math.max(S.to - 1, H0); }
+    render();
+  });
+  function readHash() { S.tab = location.hash === '#nhom' ? 'nhom' : 'toi'; }
+  window.addEventListener('hashchange', function () { readHash(); render(); });
+  readHash();
+  render();
+
+  /* ---------- shared data ---------- */
+  function connect() {
+    var use = window.claude && window.claude.use ? window.claude.use('db') : Promise.resolve(null);
+    use.then(function (db) {
+      if (!db) { loadLocal(); S.note = 'Chưa kết nối dữ liệu chung nên giờ rảnh chỉ lưu trên máy này. Mở trang qua link đã xuất bản để cả nhóm thấy nhau.'; render(); return; }
+      DB = db;
+      var slow = setTimeout(function () { S.note = 'Chưa kết nối được dữ liệu chung, có thể bạn đang xem bản cũ.'; render(); }, 10000);
+      function ok(snap) { if (!snap.metadata.fromCache) { clearTimeout(slow); if (S.note) { S.note = ''; render(); } } }
+      function fail() { clearTimeout(slow); S.note = 'Không đọc được dữ liệu chung. Thử mở lại trang.'; render(); }
+      db.collection('avail').onSnapshot(function (snap) {
+        snap.docs.forEach(function (doc) {
+          if (!person(doc.id) || dirty[doc.id]) return;
+          var data = doc.data() || {};
+          S.people[doc.id] = cleanSlots(data.slots);
+        });
+        ok(snap); render();
+      }, fail);
+      db.doc('meta/final').onSnapshot(function (doc) {
+        S.final = doc.exists ? validFinal(doc.data()) : null; render();
+      }, function () {});
+    }).catch(function () { loadLocal(); render(); });
+  }
+  connect();
+
+  /* ---------- pixel scene ---------- */
+  var cv = $('#scene'), cx = cv.getContext('2d'), W = 200, HT = 72;
+  cx.imageSmoothingEnabled = false;
+  function R(x, y, w, h, c) { cx.fillStyle = c; cx.fillRect(Math.round(x), Math.round(y), w, h); }
+  function disc(x, y, r, c) { for (var j = -r; j <= r; j++) { var w = Math.floor(Math.sqrt(r * r - j * j)); R(x - w, y + j, 2 * w + 1, 1, c); } }
+  function band(x, y, r1, r2, c) {
+    for (var yy = y - r2; yy <= y; yy++) {
+      var dy = y - yy, outer = Math.floor(Math.sqrt(Math.max(0, r2 * r2 - dy * dy)));
+      if (dy < r1) { var inner = Math.floor(Math.sqrt(r1 * r1 - dy * dy)); R(x - outer, yy, outer - inner, 1, c); R(x + inner + 1, yy, outer - inner, 1, c); }
+      else R(x - outer, yy, 2 * outer + 1, 1, c);
+    }
+  }
+  var PAL = {
+    day: { sky: ['#86c2ff', '#9cceff', '#b3dbff', '#c7e7ff', '#daf1ff', '#e9f8ff'], cloud: '#ffffff', cloud2: '#d2e6ff', sun: '#ffd75e',
+      rb: ['#ea4a6d', '#f39a3b', '#f4e04d', '#4fcf63', '#3d8fe8', '#c23de0'], hill: '#79c98a', hill2: '#63b576',
+      g1: '#93de6c', g2: '#7ccb5a', g3: '#b4ee8c', trunk: '#8a5a44', trunk2: '#6b4232', c1: '#3f8f5a', c2: '#2f7549', c3: '#5db477', pond: '#5aa8f0', pond2: '#a6d6ff' },
+    night: { sky: ['#121744', '#181e50', '#202760', '#2a3371', '#363e80', '#454c8f'], cloud: '#5c62a3', cloud2: '#454b88', sun: '#f4f1d0',
+      rb: ['#a83a64', '#b2733a', '#b0a64a', '#3d9a55', '#3568b0', '#8a3aa0'], hill: '#2a6a5c', hill2: '#235a50',
+      g1: '#2f7a52', g2: '#276b47', g3: '#3e946a', trunk: '#6a4636', trunk2: '#4f3226', c1: '#2a6a46', c2: '#215738', c3: '#3c8458', pond: '#2f4fa0', pond2: '#5a7ad0' }
+  };
+  var SPR = [
+    '...CCCCCC...', '..CCCCCCCC..', '..HHHHHHHH..', '.HHSSSSSSHH.', '.HSGGSSGGSH.', '..SSSSSSSS..', '...SSSSSS...',
+    '..BBBBBBBB..', '.BBBBBBBBBB.', '.BBBBBBBBBB.', '.BBBBLLBBBB.', '.BBBBBBBBBB.', '.SBBBBBBBBS.', '...DDDDDD...', '...DD..DD...', '..WWW..WWW..'
+  ];
+  var HAIR = ['#2b2433', '#5a3a2a', '#1d1d2a', '#3b2a22'];
+  var CLOUDS = [{ x: 10, y: 8, s: 0.5 }, { x: 85, y: 18, s: 0.35 }, { x: 150, y: 6, s: 0.45 }];
+  var STARS = [[12, 6], [30, 14], [52, 5], [70, 20], [96, 9], [124, 4], [140, 18], [188, 24], [20, 30], [160, 32]];
+
+  function isDark() {
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t) return t === 'dark';
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function cloud(x, y, P) {
+    R(x + 4, y - 2, 7, 2, P.cloud); R(x, y, 15, 2, P.cloud); R(x + 2, y + 2, 11, 1, P.cloud2);
+  }
+  function char(x, y, i, pc) {
+    var map = { C: pc, H: HAIR[i], S: '#f7c9a3', G: '#1d2340', B: pc, L: '#ffffff', D: '#2a2f4a', W: '#f4f4f4' };
+    for (var r = 0; r < SPR.length; r++) for (var c = 0; c < 12; c++) {
+      var ch = SPR[r].charAt(c); if (ch !== '.') R(x + c, y + r, 1, 1, map[ch]);
+    }
+  }
+  var PCOL = { light: ['#e0457b', '#e8892b', '#7a4fd6', '#17a0b2'], dark: ['#ff6b9c', '#ffa34d', '#a583ff', '#3ccbdc'] };
+
+  function frame(t) {
+    var dark = isDark(), P = dark ? PAL.night : PAL.day, f = Math.floor(t / 150), i;
+    for (i = 0; i < 6; i++) R(0, i * 9, W, 9, P.sky[i]);
+    if (dark) {
+      STARS.forEach(function (s, j) { if ((f + j) % 5 !== 0) R(s[0], s[1], 1, 1, '#ffffff'); });
+      disc(178, 13, 6, P.sun); disc(181, 11, 5, P.sky[1]);
+    } else { disc(178, 13, 6, P.sun); }
+    CLOUDS.forEach(function (c) { cloud(((c.x + f * c.s) % (W + 50)) - 25, c.y, P); });
+    for (i = 0; i < 6; i++) band(100, 58, 46 - i * 2, 48 - i * 2, P.rb[i]);
+    disc(36, 64, 22, P.hill); disc(166, 66, 26, P.hill); disc(100, 70, 22, P.hill2);
+    R(0, 54, W, 18, P.g1); R(0, 54, W, 1, P.g2);
+    for (i = 0; i < 46; i++) { var gx = (i * 37) % W, gy = 56 + (i * 13) % 14; R(gx, gy, 2, 1, P.g2); R(gx + 1, gy - 1, 1, 1, P.g3); }
+    /* tree */
+    R(10, 34, 6, 22, P.trunk); R(10, 34, 2, 22, P.trunk2); R(8, 54, 10, 2, P.trunk); R(11, 42, 3, 3, '#2a1a24');
+    disc(12, 26, 11, P.c2); disc(11, 23, 9, P.c1); disc(24, 22, 8, P.c2); disc(23, 20, 6, P.c1); R(6, 17, 4, 2, P.c3); R(20, 14, 4, 2, P.c3);
+    /* pond */
+    R(150, 58, 50, 14, P.pond); R(152, 57, 46, 1, P.pond); R(156 + (f % 5) * 7, 62, 4, 1, P.pond2); R(172 + (f % 4) * 5, 67, 4, 1, P.pond2);
+    var dx = 168 + Math.round(Math.sin(f / 8) * 7), dy = 60;
+    R(dx - 1, dy + 1, 1, 2, '#e9e9ee'); R(dx, dy + 2, 7, 3, '#e9e9ee'); R(dx + 2, dy + 3, 3, 1, '#9a7a4a'); R(dx + 6, dy, 3, 3, '#2c9a52'); R(dx + 9, dy + 1, 2, 1, '#f2b630'); R(dx + 7, dy, 1, 1, '#111111');
+    /* mushrooms */
+    R(30, 50, 6, 1, '#e8465a'); R(29, 51, 8, 3, '#e8465a'); R(31, 51, 1, 1, '#fff'); R(34, 52, 1, 1, '#fff'); R(32, 54, 2, 3, '#f3e6d0');
+    R(41, 55, 5, 2, '#e8465a'); R(42, 55, 1, 1, '#fff'); R(43, 57, 2, 2, '#f3e6d0');
+    /* friends */
+    var cols = dark ? PCOL.dark : PCOL.light, meIdx = -1;
+    for (i = 0; i < PEOPLE.length; i++) if (PEOPLE[i].id === S.me) meIdx = i;
+    for (i = 0; i < 4; i++) {
+      var off = i === meIdx ? [0, -1, -2, -1][f % 4] : ((f + i) % 2);
+      char(63 + i * 20, 46 + off, i, cols[i]);
+      if (i === meIdx) { R(67 + i * 20, 41 + off, 4, 1, '#ffd75e'); R(68 + i * 20, 42 + off, 2, 1, '#ffd75e'); }
+    }
+    /* sparkles + butterfly */
+    [[60, 57], [80, 59], [104, 60], [128, 58], [146, 56]].forEach(function (s, j) {
+      if ((f + j) % 3 === 0) { R(s[0], s[1] - 1, 1, 3, '#ffffff'); R(s[0] - 1, s[1], 3, 1, '#ffffff'); R(s[0], s[1], 1, 1, '#ffd75e'); }
+    });
+    var bx = 100 + Math.sin(f / 10) * 55, by = 36 + Math.sin(f / 6) * 6;
+    if (f % 2) { R(bx - 2, by, 2, 2, '#ff8bd0'); R(bx + 1, by, 2, 2, '#ff8bd0'); } else R(bx - 1, by + 1, 3, 1, '#ff8bd0');
+  }
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  frame(0);
+  if (!reduce) setInterval(function () { if (!document.hidden) frame(performance.now()); }, 150);
+  else document.addEventListener('click', function () { frame(0); });
+})();
+</script>
